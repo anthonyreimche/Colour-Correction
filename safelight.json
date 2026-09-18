@@ -1,0 +1,13 @@
+{
+  "id": "colour-correction",
+  "name": "Colour Correction",
+  "version": "1.0.0",
+  "description": "A port of darktable's colour correction module — tint shadows and highlights separately on an a/b colour board (split-toning) and set the global saturation, in Lab, exactly as darktable does it.",
+  "author": "Anthony Reimche",
+  "main": "dist/index.js",
+  "license": "GPL-3.0-or-later",
+  "categories": ["Develop", "Color"],
+  "keywords": ["darktable", "colour-correction", "color-correction", "split-toning", "split-tone", "tint", "saturation", "lab"],
+  "repository": "anthonyreimche/Colour-Correction",
+  "minAppVersion": "2.5.0"
+}

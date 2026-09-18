@@ -1,0 +1,20 @@
+{
+  "name": "safelight-colour-correction",
+  "version": "1.0.0",
+  "description": "Colour Correction extension for SafeLight — a port of darktable's colour correction module: split-toning and saturation in Lab.",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc src/model.ts src/stage.ts --outDir test/.build --module commonjs --target es2021 --skipLibCheck && node test/prep.cjs && node test/verify-model.cjs && node test/verify-stage.cjs",
+    "test:gpu": "node test/gpu/run.cjs"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "keywords": ["safelight-extension"],
+  "license": "GPL-3.0-or-later"
+}
