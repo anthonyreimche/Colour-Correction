@@ -29,6 +29,16 @@ export type ProcessingPhase =
   | "effects"
   | "output-encode";
 
+/** The values a processing stage receives and hands back. */
+export interface StageSpace {
+  /** "linear": proportional to light. "perceptual": the sRGB curve extended both
+   *  ways (sign kept, no ceiling), so display-style maths still sees what lies
+   *  beyond [0, 1]. */
+  encoding: "linear" | "perceptual";
+  /** Default "rec709", the core's working primaries. */
+  primaries?: "rec709" | "rec2020";
+}
+
 /** A GLSL fragment spliced into the develop shader. Display-space phases
  *  read and write `vec3 c`, the display-encoded colour; uniform keys and
  *  helper function names are namespaced by the host at identifier boundaries. */
@@ -41,6 +51,10 @@ export interface ProcessingStageContribution {
   helpers?: string;
   uniforms: UniformDeclaration[];
   presetScope?: "global" | "per-image";
+  /** Opt into full-information values. Omitted, a display-domain stage is handed
+   *  `c` clipped to [0, 1] on process version 2, the clip written ahead of its
+   *  block and outside its own gate. Hosts before process versions ignore it. */
+  space?: StageSpace;
 }
 
 export interface PanelDockDefault {

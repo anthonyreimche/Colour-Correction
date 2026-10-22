@@ -3,13 +3,15 @@
 // darktable's Lab section (display-referred, after the tone transform, before
 // vignette and grain). There is no prepass; the correction is per pixel.
 //
-// The display colour `c` arrives sRGB-encoded. It is decoded with the host's
-// own transfer function, taken to D50 Lab through the Bradford-adapted sRGB
-// matrices (darktable's Lab is D50), corrected, and encoded back, which clips
-// anything the shift pushed out of gamut. The matrices, white point and CIE
-// constants are formatted from the model's numbers, so the shader and the CPU
-// reference cannot drift apart. At the defaults the branch is not taken and
-// the stage is a bit-exact no-op.
+// The display colour `c` arrives sRGB-encoded. The stage declares the display's
+// own space, so on process version 2 the host hands it unclipped and the branch
+// clips it to [0, 1] itself, then decodes it with the host's transfer function,
+// takes it to D50 Lab through the Bradford-adapted sRGB matrices (darktable's
+// Lab is D50), corrects it, and encodes it back, which clips anything the shift
+// pushed out of gamut. The matrices, white point and CIE constants are
+// formatted from the model's numbers, so the shader and the CPU reference
+// cannot drift apart. At the defaults the branch is not taken and the stage is
+// a bit-exact no-op, values outside [0, 1] included.
 
 import type { ProcessingStageContribution, UniformDeclaration } from "./safelight";
 import {
@@ -104,6 +106,7 @@ export function colourCorrectionStage(): ProcessingStageContribution {
     id: STAGE_ID,
     name: "Colour Correction",
     phase: "display-adjust",
+    space: { encoding: "perceptual" },
     glsl: INLINE,
     helpers: HELPERS,
     uniforms: UNIFORMS,

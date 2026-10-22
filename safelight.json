@@ -1,7 +1,7 @@
 {
   "id": "colour-correction",
   "name": "Colour Correction",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A port of darktable's colour correction module — tint shadows and highlights separately on an a/b colour board (split-toning) and set the global saturation, in Lab, exactly as darktable does it.",
   "author": "Anthony Reimche",
   "main": "dist/index.js",

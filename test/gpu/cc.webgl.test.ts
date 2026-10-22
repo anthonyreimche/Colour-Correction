@@ -19,8 +19,10 @@
 // half-float step.
 
 import { describe, expect, it } from "vitest";
+import { CURRENT_PROCESS_VERSION, DEFAULT_GRAIN, DEFAULT_VIGNETTE } from "@/catalog/types";
 import { colourCorrectionStage } from "@cc/stage";
 import { DEFAULT_PARAMS, PRESETS, bagPatch, correctPixel, type Params } from "@cc/model";
+import type { ProcessingStageContribution } from "@cc/safelight";
 import {
   LINEAR_PROBE_PIPELINE,
   type Frame,
@@ -124,7 +126,59 @@ const cases: [string, Params][] = [
 const MAX_ABS_ERROR = 1e-3;
 const MAX_RMS_ERROR = 2e-4;
 
+/** Over-range display values on process version 2, which clips nothing
+ *  upstream: channels past white and colours outside sRGB. */
+const WIDE_SCENE = floatImage(W, H, (x, y) => {
+  const u = x / (W - 1);
+  const v = y / (H - 1);
+  if (y < H / 4) return [0.5 + 3.5 * u, 0.3 + 2.2 * u, 0.2 + 1.4 * u];
+  if (y < H / 2) return [0.2 + 1.2 * u, -0.05 - 0.45 * v, 0.1 + 0.9 * u];
+  if (y < (3 * H) / 4) return [-0.2 - 0.3 * u, 0.4 + 0.8 * v, -0.1 - 0.4 * v];
+  return [0.05 + 0.8 * u, 0.05 + 0.8 * u, 0.05 + 0.8 * u];
+});
+
+const V2_WITH_EFFECTS = {
+  processVersion: CURRENT_PROCESS_VERSION,
+  vignette: { ...DEFAULT_VIGNETTE, amount: 30 },
+  grain: { ...DEFAULT_GRAIN, amount: 100 },
+};
+
+function wideFrame(stages: ProcessingStageContribution[], bag: Record<string, unknown> = {}): Frame {
+  return withRenderer({ stages: [...builtinStages(), ...stages], pipeline: LINEAR_PROBE_PIPELINE }, (r) => {
+    r.setImage(WIDE_SCENE);
+    r.setParams(identityParams(V2_WITH_EFFECTS));
+    r.setContributedParams(bag);
+    const f = r.captureFloatFrame();
+    if (!f) throw new Error("captureFloatFrame returned null");
+    return f;
+  });
+}
+
 describe("Colour Correction stage on the real renderer", () => {
+  // On version 2 the host clips a display stage that declares no space to
+  // [0, 1] ahead of its block, outside its gate, for as long as the stage is
+  // registered, and the Vignette and Grain behind it then read clipped values.
+  // A bare stage that declares nothing is the positive control: it must change
+  // this frame, or the scene doesn't reach the display phase over range.
+  it("is a bit-exact no-op at the defaults on version 2 with values outside [0, 1]", () => {
+    const clipsAhead: ProcessingStageContribution = {
+      id: "test.clips-ahead",
+      name: "Clips ahead",
+      phase: "display-adjust",
+      glsl: "c = c;",
+      uniforms: [],
+    };
+    const bare = wideFrame([]);
+    const clipped = wideFrame([clipsAhead]);
+    let moved = 0;
+    for (let i = 0; i < bare.data.length; i++) if (bare.data[i] !== clipped.data[i]) moved++;
+    expect(moved).toBeGreaterThan(W * H * 0.1);
+    const idle = wideFrame([colourCorrectionStage()], bagPatch(DEFAULT_PARAMS));
+    let differing = 0;
+    for (let i = 0; i < idle.data.length; i++) if (idle.data[i] !== bare.data[i]) differing++;
+    expect(differing).toBe(0);
+  });
+
   it("is a bit-exact no-op at the defaults", () => {
     // Renderers share one context and a nested one's dispose() tears down GL
     // state the outer one relies on, so the two frames are taken in sequence.

@@ -24,6 +24,12 @@ check("stage id is the model's", stage.id === M.STAGE_ID, stage.id);
 check("named for the panel", stage.name === "Colour Correction");
 check("runs display-referred, like darktable's Lab section", stage.phase === "display-adjust");
 check("single inline fragment, no prepass", !stage.passes);
+check(
+  "declares the display's own space, so the host adds no clip outside the gate",
+  JSON.stringify(stage.space) === '{"encoding":"perceptual"}',
+  JSON.stringify(stage.space),
+);
+check("clips its own input inside the gate", /if \([^)]*\) \{\s*vec3 lab = ccLab\(srgbToLinear\(clamp\(c, 0\.0, 1\.0\)\)\)/.test(inline));
 
 const want = [
   ["hia", 0, -40, 40],

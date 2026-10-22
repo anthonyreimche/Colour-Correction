@@ -163,6 +163,7 @@ function Bt() {
     id: H,
     name: "Colour Correction",
     phase: "display-adjust",
+    space: { encoding: "perceptual" },
     glsl: Ot,
     helpers: Mt,
     uniforms: zt
