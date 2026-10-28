@@ -9,6 +9,10 @@
 // coarse, Ctrl fine). A drag commits on release; wheel and keys commit after a
 // short pause so one gesture is one undo entry. Rendered with the host's React
 // through createElement — no JSX, nothing to resolve at bundle time.
+//
+// It edits whatever useParamScope hands it: the photo's bag in the dock, a
+// mask's in the Masking panel's Adjust tab. Nothing here measures or picks from
+// the photo, so a mask gets the whole panel, presets included.
 
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { api } from "./runtime";
@@ -61,16 +65,14 @@ export function ColourCorrectionPanel() {
   const { createElement: h, useEffect, useRef, useState } = api().react;
   const { Slider } = api().components;
   const { Select, tokens } = api().ui;
-  const useDevelopStore = api().stores.useDevelopStore;
+  const scope = api().develop.useParamScope();
 
-  const paramBag = useDevelopStore((s) => s.paramBag);
-  const setDynParams = useDevelopStore((s) => s.setDynParams);
-  const commitEdit = useDevelopStore((s) => s.commitEdit);
-  const params = readParams(paramBag);
+  const bag = scope.getParams();
+  const params = readParams(bag);
   // Edits are relative (a notch, a nudge) or must keep the other four values,
   // and wheel and key repeats outrun React's renders, so they start from the
-  // store's current bag rather than this render's snapshot.
-  const live = (): Params => readParams(useDevelopStore.getState().paramBag);
+  // bag the scope holds now rather than this render's snapshot.
+  const live = (): Params => readParams(scope.getParams());
 
   const [selected, setSelected] = useState<Dot | null>(null);
   const [size, setSize] = useState(240);
@@ -80,8 +82,8 @@ export function ColourCorrectionPanel() {
   const pressRef = useRef<Press | null>(null);
   const commitTimer = useRef<number | null>(null);
 
-  const apply = (next: Params) => setDynParams(bagPatch(next));
-  const commit = () => void commitEdit(COMMIT_LABEL);
+  const apply = (next: Params) => scope.setParams(bagPatch(next));
+  const commit = () => scope.commit(COMMIT_LABEL);
   const commitSoon = () => {
     if (commitTimer.current !== null) window.clearTimeout(commitTimer.current);
     commitTimer.current = window.setTimeout(() => {
@@ -111,7 +113,8 @@ export function ColourCorrectionPanel() {
   }, []);
 
   // Attached natively and non-passive so the dock does not scroll; React's
-  // onWheel is passive and cannot preventDefault.
+  // onWheel is passive and cannot preventDefault. The Masking panel keeps this
+  // instance when another mask is selected, so the listener follows the scope.
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -122,7 +125,7 @@ export function ColourCorrectionPanel() {
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [scope.maskId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -134,7 +137,7 @@ export function ColourCorrectionPanel() {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawBoard(ctx, size, params, selected);
-  }, [paramBag, selected, size]);
+  }, [bag, selected, size]);
 
   // Pointer → board a/b through the rendered rect, so interface-scale zoom
   // and CSS sizing cannot desync the hit-test from the drawing.

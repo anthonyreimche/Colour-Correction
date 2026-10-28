@@ -7,7 +7,9 @@
 //  • at the defaults the stage is a bit-exact no-op;
 //  • the rendered pixels equal the model's correctPixel — darktable's
 //    formula through the same Lab plumbing — to capture precision, for
-//    darktable's presets and stronger edits.
+//    darktable's presets and stronger edits;
+//  • a mask's copy of the stage applies the mask's correction inside the mask
+//    only, leaving every pixel outside it as the photo's own correction left it.
 //
 // The stage's input is the display colour after the host's tone chain, which
 // carries an 8-bit tone-curve LUT (about 1/512 of drift even at identity), so
@@ -19,7 +21,7 @@
 // half-float step.
 
 import { describe, expect, it } from "vitest";
-import { CURRENT_PROCESS_VERSION, DEFAULT_GRAIN, DEFAULT_VIGNETTE } from "@/catalog/types";
+import { CURRENT_PROCESS_VERSION, DEFAULT_GRAIN, DEFAULT_VIGNETTE, defaultMaskAdjustments, type Mask } from "@/catalog/types";
 import { colourCorrectionStage } from "@cc/stage";
 import { DEFAULT_PARAMS, PRESETS, bagPatch, correctPixel, type Params } from "@cc/model";
 import type { ProcessingStageContribution } from "@cc/safelight";
@@ -71,13 +73,16 @@ interface Comparison {
 
 const CORNERS = [-1, 1];
 
-function compare(on: Frame, off: Frame, params: Params): Comparison {
+/** The GPU frame against the model, over the columns `inside` picks (all by default). */
+function compare(on: Frame, off: Frame, params: Params, inside = (_x: number) => true): Comparison {
   let se = 0;
   let max = 0;
   let change = 0;
   let worst = "";
-  const n = W * H * 3;
+  let n = 0;
   for (let p = 0; p < W * H; p++) {
+    if (!inside(p % W)) continue;
+    n += 3;
     const o = p * 4;
     const c: [number, number, number] = [off.data[o], off.data[o + 1], off.data[o + 2]];
     const centre = correctPixel(c, params);
@@ -113,9 +118,12 @@ function compare(on: Frame, off: Frame, params: Params): Comparison {
   return { max, rmse: Math.sqrt(se / n), changeRms: Math.sqrt(change / n), worst };
 }
 
+/** Every param off its default, so a mask's copy is seen to bind all five. */
+const SPLIT_TONE: Params = { loa: -20, lob: -15, hia: 25, hib: 30, saturation: 1.5 };
+
 const cases: [string, Params][] = [
   ...PRESETS.map((p): [string, Params] => [p.label, p.params]),
-  ["strong split-tone", { loa: -20, lob: -15, hia: 25, hib: 30, saturation: 1.5 }],
+  ["strong split-tone", SPLIT_TONE],
   ["saturation 0", { ...DEFAULT_PARAMS, saturation: 0 }],
   ["saturation -1 (complementary)", { ...DEFAULT_PARAMS, saturation: -1 }],
   ["saturation 3 with a cold shadow tint", { loa: -8, lob: -12, hia: 0, hib: 0, saturation: 3 }],
@@ -141,6 +149,15 @@ const V2_WITH_EFFECTS = {
   processVersion: CURRENT_PROCESS_VERSION,
   vignette: { ...DEFAULT_VIGNETTE, amount: 30 },
   grain: { ...DEFAULT_GRAIN, amount: 100 },
+};
+
+// A linear gradient whose step sits at u = 0.5: the right half is covered.
+const RIGHT_HALF: Mask["components"][number] = {
+  id: "right",
+  kind: "linear",
+  mode: "add",
+  invert: false,
+  linear: { x0: 0.5, y0: 0, x1: 0.5001, y1: 0 },
 };
 
 function wideFrame(stages: ProcessingStageContribution[], bag: Record<string, unknown> = {}): Frame {
@@ -235,6 +252,49 @@ describe("Colour Correction stage on the real renderer", () => {
           expect(s.max).toBeLessThan(MAX_ABS_ERROR);
           expect(s.rmse).toBeLessThan(MAX_RMS_ERROR);
         }
+      },
+    );
+  });
+
+  it("applies a mask's correction inside the mask, and the photo's everywhere else", () => {
+    const mask: Mask = {
+      id: "m",
+      name: "Mask",
+      visible: true,
+      invert: false,
+      opacity: 100,
+      adj: defaultMaskAdjustments(),
+      panels: ["colour-correction.panel"],
+      bag: bagPatch(SPLIT_TONE),
+      components: [RIGHT_HALF],
+    };
+    withRenderer(
+      { stages: [...builtinStages(), colourCorrectionStage()], pipeline: LINEAR_PROBE_PIPELINE },
+      (renderer) => {
+        renderer.setImage(SCENE);
+        renderer.setContributedParams(bagPatch(DEFAULT_PARAMS));
+        renderer.setParams(identityParams({ processVersion: 2 }));
+        const off = renderer.captureFloatFrame();
+        renderer.setParams(identityParams({ processVersion: 2, masks: [mask] }));
+        const on = renderer.captureFloatFrame();
+        expect(off).not.toBeNull();
+        expect(on).not.toBeNull();
+
+        // Columns either side of the step, clear of the pixel it straddles.
+        const left = (x: number) => x < W / 2 - 1;
+        const right = (x: number) => x > W / 2;
+        for (let p = 0; p < W * H; p++) {
+          if (!left(p % W)) continue;
+          for (let ch = 0; ch < 3; ch++) expect(on!.data[p * 4 + ch]).toBe(off!.data[p * 4 + ch]);
+        }
+        const s = compare(on!, off!, SPLIT_TONE, right);
+        console.log(
+          `[cc-gpu] masked strong split-tone: change rms ${s.changeRms.toExponential(2)}; ` +
+            `error rms ${s.rmse.toExponential(2)}, max ${s.max.toExponential(2)} at ${s.worst}`,
+        );
+        expect(s.changeRms).toBeGreaterThan(1e-3);
+        expect(s.max).toBeLessThan(MAX_ABS_ERROR);
+        expect(s.rmse).toBeLessThan(MAX_RMS_ERROR);
       },
     );
   });

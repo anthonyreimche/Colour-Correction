@@ -29,7 +29,12 @@ check(
   JSON.stringify(stage.space) === '{"encoding":"perceptual"}',
   JSON.stringify(stage.space),
 );
-check("clips its own input inside the gate", /if \([^)]*\) \{\s*vec3 lab = ccLab\(srgbToLinear\(clamp\(c, 0\.0, 1\.0\)\)\)/.test(inline));
+check(
+  "runs again inside each mask that holds its keys, with that mask's values",
+  JSON.stringify(stage.mask) === '{"maskable":true}',
+  JSON.stringify(stage.mask),
+);
+check("clips its own input inside the gate",/if \([^)]*\) \{\s*vec3 lab = ccLab\(srgbToLinear\(clamp\(c, 0\.0, 1\.0\)\)\)/.test(inline));
 
 const want = [
   ["hia", 0, -40, 40],

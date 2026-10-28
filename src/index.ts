@@ -11,7 +11,7 @@ import type { SafelightAPI } from "./safelight";
 import { api, initRuntime } from "./runtime";
 import { colourCorrectionStage } from "./stage";
 import { ColourCorrectionPanel } from "./Panel";
-import { BASE_ID, DEFAULT_PARAMS, STAGE_ID, bagPatch } from "./model";
+import { BASE_ID, DEFAULT_PARAMS, PARAM_KEYS, STAGE_ID, bagPatch, paramKey } from "./model";
 
 const PANEL_ID = `${BASE_ID}.panel`;
 
@@ -32,6 +32,8 @@ export function activate(host: SafelightAPI): void {
     component: ColourCorrectionPanel,
     defaultDock: { module: "develop", direction: "right", order: 7, width: 268 },
     onReset: resetPanel,
+    // The same panel edits a mask's correction in the Masking panel's Adjust tab.
+    mask: { component: ColourCorrectionPanel, owns: PARAM_KEYS.map(paramKey) },
   });
 }
 

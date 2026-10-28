@@ -110,5 +110,8 @@ export function colourCorrectionStage(): ProcessingStageContribution {
     glsl: INLINE,
     helpers: HELPERS,
     uniforms: UNIFORMS,
+    // A mask's copy runs at the defaults until its board moves, so the gate
+    // keeps an untouched mask bit-exact too.
+    mask: { maskable: true },
   };
 }

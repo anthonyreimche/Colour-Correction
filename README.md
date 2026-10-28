@@ -33,6 +33,12 @@ tint, the **light dot** the highlight tint, and a line joins them.
 - **Presets** are darktable's own, with its exact values: Warm tone, Warming
   filter, Cooling filter.
 - Right-click the panel header for *Reset to defaults*.
+- **In masks:** add Colour Correction to a mask from the Masking panel's
+  Adjust tab to split-tone or set the saturation inside that mask only. The
+  mask's Colour Correction is the whole panel: the board, the saturation
+  slider and the presets, applied to the mask's own values. It needs the
+  current processing: on a photo edited in an earlier SafeLight, use Update
+  processing first.
 
 The board sits on the panel's themed surface; the dots keep darktable's dark
 and light greys because they mean something ("bright means highlights, dark
@@ -72,8 +78,8 @@ Differences from darktable to be aware of:
 - darktable feeds the module the Lab of its input profile; SafeLight converts
   from its display sRGB. Neutrals match exactly, tints match for an sRGB
   working space, and very saturated colours can differ slightly in hue angle.
-- No blend modes or masks yet (SafeLight's per-mask extension stages are still
-  pending in core).
+- No blend modes. Masks come from SafeLight's Masking panel (see *In masks*
+  above) rather than darktable's drawn and parametric masks on the module.
 
 ### Tests
 
@@ -84,13 +90,17 @@ presets verbatim, the board mapping and darktable's picking rule, wheel and
 arrow clamps, the swatch colours, and the param-bag contract. A second script
 pins the GPU stage's contract: the phase, the five uniforms and their defaults,
 the gate that idles the shader at the defaults, zero texture fetches, no bare
-integer literals, and that the shader's matrices are formatted from the model's
-constants so the two can never drift apart.
+integer literals, that the stage runs inside masks, and that the shader's
+matrices are formatted from the model's constants so the two can never drift
+apart. A third checks the registration: the panel serves masks too and owns
+exactly the five keys it writes and the stage reads.
 
 `npm run test:gpu` runs the stage through a SafeLight checkout's WebGL harness
 (headless Chromium on SwiftShader): the shader compiles inside the develop
-program, an untouched photo is a bit-exact no-op, and darktable's presets plus
-stronger edits render to within half-float capture precision of the model. It
+program, an untouched photo is a bit-exact no-op, darktable's presets plus
+stronger edits render to within half-float capture precision of the model, and
+a mask's correction lands inside the mask to the same precision while every
+pixel outside it stays bit for bit as the photo's own correction left it. It
 needs the SafeLight repository beside this one (or `SAFELIGHT_CORE=<path>`)
 with its dev dependencies installed.
 
@@ -99,7 +109,7 @@ with its dev dependencies installed.
 Install from the SafeLight **Extensions** window, or load this folder via
 Developer Tools ▸ Extensions during development. A **Colour Correction** panel
 appears in Develop (right dock). Build from source with `npm install && npm run
-build` (outputs `dist/index.js`). Needs SafeLight 2.5.0 or newer.
+build` (outputs `dist/index.js`). Needs SafeLight 3.1.0 or newer.
 
 ## License & credits
 
