@@ -66,6 +66,15 @@ check("defaults: no shift, saturation 1", sameParams(M.DEFAULT_PARAMS, P(0, 0, 0
     worst = Math.max(worst, Math.abs(M.linearToSrgb(M.srgbToLinear(v)) - v));
   }
   check("encode(decode(v)) round-trips", worst < 1e-9, `max ${worst.toExponential(1)}`);
+  let differs = 0;
+  for (let i = 0; i <= 200; i++) {
+    const v = i / 200;
+    if (M.decodePerceptual(v) !== M.srgbToLinear(v) || M.encodePerceptual(v) !== M.linearToSrgb(v)) differs++;
+  }
+  check("the signed transfer functions are the host's on [0,1]", differs === 0, `${differs} differ`);
+  check("the signed transfer functions keep the sign", M.encodePerceptual(-0.2) === -M.encodePerceptual(0.2) && M.decodePerceptual(-0.6) === -M.decodePerceptual(0.6));
+  check("and have no ceiling", M.encodePerceptual(4) > 1 && M.decodePerceptual(1.5) > 1);
+  check("and round-trip beyond [0,1]", [-3, -0.5, -0.001, 1.2, 4].every((v) => near(M.decodePerceptual(M.encodePerceptual(v)), v, 1e-12)));
 }
 
 // ── Lab (D50, Bradford-adapted sRGB, like darktable's Lab profile) ───────────
@@ -110,7 +119,32 @@ check("defaults: no shift, saturation 1", sameParams(M.DEFAULT_PARAMS, P(0, 0, 0
   const bright = M.correctPixel([0.85, 0.85, 0.85], split);
   check("split-tone: shadows take the shadow tint (-a -b: blue/green), highlights the highlight tint", dark[2] > dark[0] && bright[0] > bright[2]);
   const extreme = M.correctPixel([0.9, 0.2, 0.1], P(-40, -40, 40, 40, 3));
-  check("out-of-gamut results are clipped to [0,1]", extreme.every((v) => v >= 0 && v <= 1));
+  check("out-of-gamut results keep their range (past white, below black)", extreme.some((v) => v > 1) && extreme.some((v) => v < 0), extreme.map((v) => v.toFixed(3)).join(","));
+  const over = [1.2, 0.9, -0.05];
+  const nudged = M.correctPixel(over, P(0, 0, 0, 0.01));
+  check("a tiny shift leaves (1.2, 0.9, -0.05) within 1e-3", nudged.every((v, k) => Math.abs(v - over[k]) < 1e-3), nudged.map((v) => v.toFixed(5)).join(","));
+  const warmOver = M.correctPixel(over, M.PRESETS[0].params);
+  check("warm tone keeps (1.2, 0.9, -0.05) past white and below black", warmOver[0] > 1 && warmOver[2] < 0, warmOver.map((v) => v.toFixed(4)).join(","));
+  // The path before the range fix: clip, decode, Lab, correct, back, clip.
+  const clipping = (px, p) => {
+    const rgb = M.linearSrgbFromLab(M.correctLab(M.labFromLinearSrgb(px.map((v) => M.srgbToLinear(Math.min(1, Math.max(0, v))))), p));
+    return rgb.map(M.linearToSrgb);
+  };
+  let inRangeWorst = 0;
+  let compared = 0;
+  for (const p of [...M.PRESETS.map((x) => x.params), P(-20, -15, 25, 30, 1.5), P(0, 0, 0, 0, -1)]) {
+    for (let i = 0; i <= 10; i++) {
+      for (let j = 0; j <= 10; j++) {
+        const px = [i / 10, j / 10, ((i * 3 + j) % 11) / 10];
+        const out = M.correctPixel(px, p);
+        if (!out.every((v) => v >= 0 && v <= 1)) continue;
+        compared++;
+        const ref = clipping(px, p);
+        for (let k = 0; k < 3; k++) inRangeWorst = Math.max(inRangeWorst, Math.abs(out[k] - ref[k]));
+      }
+    }
+  }
+  check("in-range pixels whose result stays in gamut match the clipping path exactly", compared > 300 && inRangeWorst === 0, `${compared} px, max ${inRangeWorst.toExponential(1)}`);
   const flat = M.correctPixel([0.7, 0.3, 0.4], P(0, 0, 0, 0, 0));
   check("saturation 0 gives a neutral grey of the same L", Math.abs(flat[0] - flat[1]) < 1e-9 && Math.abs(flat[1] - flat[2]) < 1e-9 && flat[0] > 0.3 && flat[0] < 0.7);
   const pinkIn = M.labFromLinearSrgb([M.srgbToLinear(0.8), M.srgbToLinear(0.4), M.srgbToLinear(0.5)]);

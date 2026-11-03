@@ -4,11 +4,17 @@
 // vignette and grain). There is no prepass; the correction is per pixel.
 //
 // The display colour `c` arrives sRGB-encoded. The stage declares the display's
-// own space, so on process version 2 the host hands it unclipped and the branch
-// clips it to [0, 1] itself, then decodes it with the host's transfer function,
+// own space, so on process version 2 the host hands it unclipped. The branch
+// decodes it with the host's curve extended both ways (sign kept, no ceiling),
 // takes it to D50 Lab through the Bradford-adapted sRGB matrices (darktable's
-// Lab is D50), corrects it, and encodes it back, which clips anything the shift
-// pushed out of gamut. The matrices, white point and CIE constants are
+// Lab is D50), corrects it, and encodes it back the same way, so values past
+// white and colours outside sRGB come out as darktable's Lab modules leave
+// them, unclipped; on [0, 1] the curves are the host's srgbToLinear and
+// linearToSrgb. Declaring the linear encoding instead would convert every
+// pixel on every photo, rounding the idle stage's output and costing two pows
+// while it does nothing. Photos on process version 1 keep the shader they were
+// edited with, which clipped `c` to [0, 1] and used the host's clipping curves
+// (SL_PROCESS_VERSION picks the path). The matrices, white point and CIE constants are
 // formatted from the model's numbers, so the shader and the CPU reference
 // cannot drift apart. At the defaults the branch is not taken and the stage is
 // a bit-exact no-op, values outside [0, 1] included.
@@ -47,6 +53,16 @@ const KAPPA = glslLiteral(LAB_KAPPA);
 const WHITE = `vec3(${D50_WHITE.map(glslLiteral).join(", ")})`;
 
 const HELPERS = `
+#if SL_PROCESS_VERSION >= 2
+vec3 ccDecode(vec3 y) {
+  vec3 a = abs(y);
+  return sign(y) * mix(a / 12.92, pow((a + 0.055) / 1.055, vec3(2.4)), step(0.04045, a));
+}
+vec3 ccEncode(vec3 x) {
+  vec3 a = abs(x);
+  return sign(x) * mix(a * 12.92, 1.055 * pow(a, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, a));
+}
+#endif
 float ccF(float t) {
   return t > ${EPS} ? pow(t, 1.0 / 3.0) : (${KAPPA} * t + 16.0) / 116.0;
 }
@@ -74,10 +90,18 @@ vec3 ccRgb(vec3 lab) {
 const INLINE = `
 {
   if (saturation != 1.0 || hia != 0.0 || hib != 0.0 || loa != 0.0 || lob != 0.0) {
+#if SL_PROCESS_VERSION >= 2
+    vec3 lab = ccLab(ccDecode(c));
+#else
     vec3 lab = ccLab(srgbToLinear(clamp(c, 0.0, 1.0)));
+#endif
     lab.y = saturation * (lab.y + lab.x * (hia - loa) * 0.01 + loa);
     lab.z = saturation * (lab.z + lab.x * (hib - lob) * 0.01 + lob);
+#if SL_PROCESS_VERSION >= 2
+    c = ccEncode(ccRgb(lab));
+#else
     c = linearToSrgb(ccRgb(lab));
+#endif
   }
 }
 `;

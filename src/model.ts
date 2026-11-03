@@ -70,6 +70,19 @@ export function linearToSrgb(v: number): number {
   return c < 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
 }
 
+/** srgbToLinear on |v| with the sign put back and no ceiling: the host's
+ *  curve on [0, 1], and display values past white or below black keep their
+ *  meaning. */
+export function decodePerceptual(v: number): number {
+  return Math.sign(v) * srgbToLinear(Math.abs(v));
+}
+
+/** linearToSrgb's curve on |v| with the sign put back and no ceiling. */
+export function encodePerceptual(v: number): number {
+  const a = Math.abs(v);
+  return Math.sign(v) * (a < 0.0031308 ? a * 12.92 : 1.055 * Math.pow(a, 1 / 2.4) - 0.055);
+}
+
 export const D50_WHITE: Vec3 = [0.96422, 1.0, 0.82521];
 
 /** Linear sRGB → XYZ (D50), row-major. */
@@ -131,15 +144,12 @@ export function linearSrgbFromLab(lab: Vec3): Vec3 {
 }
 
 /** The whole per-pixel path the shader runs, on a display-encoded pixel:
- *  decode, Lab, darktable's correction, back, encode (clipping to gamut). */
+ *  decode, Lab, darktable's correction, back, encode, all signed and unclipped
+ *  as darktable's Lab modules are (Lab's linear segment carries t < 0). */
 export function correctPixel(c: Vec3, p: Params): Vec3 {
-  const lin: Vec3 = [
-    srgbToLinear(clamp(c[0], 0, 1)),
-    srgbToLinear(clamp(c[1], 0, 1)),
-    srgbToLinear(clamp(c[2], 0, 1)),
-  ];
+  const lin: Vec3 = [decodePerceptual(c[0]), decodePerceptual(c[1]), decodePerceptual(c[2])];
   const rgb = linearSrgbFromLab(correctLab(labFromLinearSrgb(lin), p));
-  return [linearToSrgb(rgb[0]), linearToSrgb(rgb[1]), linearToSrgb(rgb[2])];
+  return [encodePerceptual(rgb[0]), encodePerceptual(rgb[1]), encodePerceptual(rgb[2])];
 }
 
 // ── presets (init_presets) ───────────────────────────────────────────────────

@@ -15,10 +15,56 @@ const check = (name, ok, detail) => {
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 const uses = (src, ident) => new RegExp(`\\b${ident}\\b`).test(src);
 
+// The source as the host's GLSL preprocessor leaves it for a photo at
+// `version`: the `#if SL_PROCESS_VERSION >= n` branches resolved and the
+// directive lines gone.
+const forVersion = (src, version) => {
+  const taking = [];
+  const out = [];
+  for (const line of src.split("\n")) {
+    const open = /^\s*#if SL_PROCESS_VERSION >= (\d+)\s*$/.exec(line);
+    if (open) taking.push(version >= Number(open[1]));
+    else if (/^\s*#else\s*$/.test(line)) taking.push(!taking.pop());
+    else if (/^\s*#endif\s*$/.test(line)) taking.pop();
+    else if (taking.every(Boolean)) out.push(line);
+  }
+  if (taking.length) throw new Error("unbalanced #if");
+  return out.join("\n");
+};
+
 const stage = S.colourCorrectionStage();
-const inline = strip(stage.glsl);
-const helpers = strip(stage.helpers || "");
+const inline = strip(forVersion(stage.glsl, 2));
+const helpers = strip(forVersion(stage.helpers || "", 2));
 const all = `${helpers}\n${inline}`;
+
+// Colour Correction 1.1.0's shader, which process version 1 photos keep: it
+// clipped the display colour to [0, 1] and decoded and encoded it with the
+// host's curves, the encode clipping again.
+const V1_INLINE = `
+{
+  if (saturation != 1.0 || hia != 0.0 || hib != 0.0 || loa != 0.0 || lob != 0.0) {
+    vec3 lab = ccLab(srgbToLinear(clamp(c, 0.0, 1.0)));
+    lab.y = saturation * (lab.y + lab.x * (hia - loa) * 0.01 + loa);
+    lab.z = saturation * (lab.z + lab.x * (hib - lob) * 0.01 + lob);
+    c = linearToSrgb(ccRgb(lab));
+  }
+}
+`;
+check("process version 1 renders 1.1.0's clipping shader, character for character", forVersion(stage.glsl, 1) === V1_INLINE, JSON.stringify(forVersion(stage.glsl, 1)));
+const v1Helpers = forVersion(stage.helpers || "", 1);
+check(
+  "process version 1's helpers are 1.1.0's, without the signed curves",
+  v1Helpers === forVersion(stage.helpers || "", 2).replace(/\nvec3 ccDecode\([\s\S]*?\n\}\nvec3 ccEncode\([\s\S]*?\n\}/, "") && !/\bcc(Decode|Encode)\b/.test(v1Helpers),
+);
+check(
+  "version 3 takes the version 2 path; each directive sits on its own line",
+  stage.glsl.includes("#if SL_PROCESS_VERSION >= 2") &&
+    [stage.glsl, stage.helpers || ""].every(
+      (src) => forVersion(src, 3) === forVersion(src, 2) && src.split("\n").filter((l) => l.trim().startsWith("#")).every((l) => /^(#if SL_PROCESS_VERSION >= 2|#else|#endif)$/.test(l)),
+    ),
+);
+const manifest = require(path.join(__dirname, "..", "safelight.json"));
+check("needs Safelight 3.2.0, the first to define SL_PROCESS_VERSION", manifest.minAppVersion === "3.2.0", manifest.minAppVersion);
 
 check("stage id is the model's", stage.id === M.STAGE_ID, stage.id);
 check("named for the panel", stage.name === "Colour Correction");
@@ -34,7 +80,14 @@ check(
   JSON.stringify(stage.mask) === '{"maskable":true}',
   JSON.stringify(stage.mask),
 );
-check("clips its own input inside the gate",/if \([^)]*\) \{\s*vec3 lab = ccLab\(srgbToLinear\(clamp\(c, 0\.0, 1\.0\)\)\)/.test(inline));
+check("decodes its signed input inside the gate", /if \([^)]*\) \{\s*vec3 lab = ccLab\(ccDecode\(c\)\);/.test(inline));
+check("encodes its result signed, with no ceiling", /c = ccEncode\(ccRgb\(lab\)\);/.test(inline));
+check("clips nothing (no clamp, min, max, saturate or the host's clipping encode)", !/\b(clamp|saturate|min|max|linearToSrgb|srgbToLinear)\s*\(/.test(all));
+check(
+  "the transfer curves run on |x| with the sign put back, so pow never sees a negative base",
+  /vec3 ccDecode\(vec3 y\) \{\s*vec3 a = abs\(y\);\s*return sign\(y\) \* mix\(a \/ 12\.92, pow\(\(a \+ 0\.055\) \/ 1\.055, vec3\(2\.4\)\), step\(0\.04045, a\)\);/.test(helpers) &&
+    /vec3 ccEncode\(vec3 x\) \{\s*vec3 a = abs\(x\);\s*return sign\(x\) \* mix\(a \* 12\.92, 1\.055 \* pow\(a, vec3\(1\.0 \/ 2\.4\)\) - 0\.055, step\(0\.0031308, a\)\);/.test(helpers),
+);
 
 const want = [
   ["hia", 0, -40, 40],
@@ -51,8 +104,6 @@ for (const [key, def, min, max] of want) {
 }
 
 check("gated: the branch is skipped at the defaults", /\bsaturation\s*!=\s*1\.0\b/.test(inline) && ["hia", "hib", "loa", "lob"].every((k) => new RegExp(`\\b${k}\\s*!=\\s*0\\.0\\b`).test(inline)));
-check("input clamped before decoding (pow on negatives is NaN)", /clamp\(\s*c\s*,\s*0\.0\s*,\s*1\.0\s*\)/.test(inline));
-check("decodes with the host's srgbToLinear and re-encodes with linearToSrgb", uses(inline, "srgbToLinear") && uses(inline, "linearToSrgb"));
 
 // Helper names the host will namespace — every one defined must be used, and
 // nothing the inline calls beyond host builtins may be undefined.
@@ -74,6 +125,8 @@ check("no calls to undefined functions", unknown.length === 0, unknown.join());
 check("zero texture fetches and no loops (constant per-pixel cost)", !/\b(texture|readPrev|texelFetch)\s*\(/.test(all) && !/\b(for|while|do)\b/.test(all));
 const bareInts = all.match(/(?<![\w.])\d+(?![\w.])/g) || [];
 check("every numeric literal carries a decimal point", bareInts.length === 0, bareInts.slice(0, 5).join());
+const v1Ints = strip(forVersion(`${stage.helpers}\n${stage.glsl}`, 1)).match(/(?<![\w.])\d+(?![\w.])/g) || [];
+check("every numeric literal on process version 1 carries a decimal point", v1Ints.length === 0, v1Ints.slice(0, 5).join());
 
 // Single source of truth: the matrices and Lab constants in the GLSL are the
 // model's numbers, formatted by the stage's own literal helper.

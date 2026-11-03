@@ -67,8 +67,12 @@ stage runs on the display-encoded colour after the tone pipeline and before
 vignette and grain. Per pixel it decodes with the host's transfer function,
 converts to D50 Lab (darktable's Lab is D50, reached here through the
 Bradford-adapted sRGB matrices, so an sRGB working image gives the same
-numbers), applies the formula, and encodes back — which clips anything the
-tint pushed out of gamut, as darktable's output stage would. At the defaults
+numbers), applies the formula, and encodes back. On photos at the current
+processing, nothing is clipped on the way: values past white and colours
+outside sRGB, including any the shift creates, pass on to the tools after it,
+as darktable's Lab modules leave them; the photo is clipped only on output. On
+photos at older processing, the colour reaching the stage is already clipped
+to [0, 1]. At the defaults
 the stage's branch is never taken and an untouched photo renders bit for bit
 unchanged. There is no pre-pass; the cost is a handful of instructions per
 pixel.

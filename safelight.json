@@ -9,5 +9,5 @@
   "categories": ["Develop", "Color"],
   "keywords": ["darktable", "colour-correction", "color-correction", "split-toning", "split-tone", "tint", "saturation", "lab"],
   "repository": "anthonyreimche/Colour-Correction",
-  "minAppVersion": "3.1.0"
+  "minAppVersion": "3.2.0"
 }

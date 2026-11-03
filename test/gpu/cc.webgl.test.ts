@@ -9,9 +9,12 @@
 //    formula through the same Lab plumbing — to capture precision, for
 //    darktable's presets and stronger edits;
 //  • a mask's copy of the stage applies the mask's correction inside the mask
-//    only, leaving every pixel outside it as the photo's own correction left it.
+//    only, leaving every pixel outside it as the photo's own correction left it;
+//  • on version 2 a tiny shift carries values past white and below black
+//    through, where a clip would pull them to [0, 1].
 //
-// The stage's input is the display colour after the host's tone chain, which
+// The capture clips to [0, 1] at the output, so the reference is clipped there
+// too. The stage's input is the display colour after the host's tone chain, which
 // carries an 8-bit tone-curve LUT (about 1/512 of drift even at identity), so
 // the reference starts from the captured idle frame rather than the scene.
 // That capture is RGBA16F, so the GPU's true input sits within half a
@@ -73,6 +76,9 @@ interface Comparison {
 
 const CORNERS = [-1, 1];
 
+/** correctPixel as the capture holds it: the frame's output clips to [0, 1]. */
+const captured = (c: [number, number, number], params: Params): number[] => correctPixel(c, params).map(clamp01);
+
 /** The GPU frame against the model, over the columns `inside` picks (all by default). */
 function compare(on: Frame, off: Frame, params: Params, inside = (_x: number) => true): Comparison {
   let se = 0;
@@ -85,13 +91,13 @@ function compare(on: Frame, off: Frame, params: Params, inside = (_x: number) =>
     n += 3;
     const o = p * 4;
     const c: [number, number, number] = [off.data[o], off.data[o + 1], off.data[o + 2]];
-    const centre = correctPixel(c, params);
+    const centre = captured(c, params);
     const lo = [...centre];
     const hi = [...centre];
     for (const sx of CORNERS) {
       for (const sy of CORNERS) {
         for (const sz of CORNERS) {
-          const r = correctPixel(
+          const r = captured(
             [c[0] + sx * halfStep(c[0]), c[1] + sy * halfStep(c[1]), c[2] + sz * halfStep(c[2])],
             params,
           );
@@ -151,6 +157,35 @@ const V2_WITH_EFFECTS = {
   grain: { ...DEFAULT_GRAIN, amount: 100 },
 };
 
+// The core shoulder keeps luminance under white, so over-range greys only reach
+// the display phase with it skipped.
+const OPEN_PROBE = { ...LINEAR_PROBE_PIPELINE, id: "test.open-probe", sig: "test.open-probe", skipToneShoulder: true };
+
+// The output clips the capture to [0, 1]. Last in the frame, this maps
+// [−0.75, 1.75] into it, so a clip anywhere upstream, past white or below
+// black, shows in the capture, even behind the core Vignette and Grain. It
+// declares a space, so it adds no clip of its own.
+const SQUEEZE: ProcessingStageContribution = {
+  id: "test.squeeze",
+  name: "Squeeze",
+  phase: "output-encode",
+  priority: 1000,
+  glsl: "c = c * 0.4 + 0.3;",
+  uniforms: [],
+  space: { encoding: "perceptual" },
+};
+
+function openFrame(stages: ProcessingStageContribution[], bag: Record<string, unknown> = {}): Frame {
+  return withRenderer({ stages: [...builtinStages(), SQUEEZE, ...stages], pipeline: OPEN_PROBE }, (r) => {
+    r.setImage(WIDE_SCENE);
+    r.setParams(identityParams(V2_WITH_EFFECTS));
+    r.setContributedParams(bag);
+    const f = r.captureFloatFrame();
+    if (!f) throw new Error("captureFloatFrame returned null");
+    return f;
+  });
+}
+
 // A linear gradient whose step sits at u = 0.5: the right half is covered.
 const RIGHT_HALF: Mask["components"][number] = {
   id: "right",
@@ -159,6 +194,32 @@ const RIGHT_HALF: Mask["components"][number] = {
   invert: false,
   linear: { x0: 0.5, y0: 0, x1: 0.5001, y1: 0 },
 };
+
+// Ahead of the stage under test, this widens whatever reaches the display
+// phase to about [−0.3, 1.3], so the stage sees values to clip on either
+// process version.
+const WIDEN: ProcessingStageContribution = {
+  id: "test.widen",
+  name: "Widen",
+  phase: "display-adjust",
+  priority: 50,
+  glsl: "c = c * 1.6 - 0.3;",
+  uniforms: [],
+  space: { encoding: "perceptual" },
+};
+
+/** The signed `c` the output stage receives, Vignette and Grain off, on
+ *  `processVersion`: the default capture clips to [0, 1] and would hide a clip. */
+function signedFrame(stages: ProcessingStageContribution[], bag: Record<string, unknown>, processVersion: number): Frame {
+  return withRenderer({ stages: [...builtinStages(), WIDEN, ...stages], pipeline: OPEN_PROBE }, (r) => {
+    r.setImage(WIDE_SCENE);
+    r.setParams(identityParams({ processVersion }));
+    r.setContributedParams(bag);
+    const f = r.readFloatFrame("pre-output", Infinity, { encoding: "perceptual" });
+    if (!f) throw new Error("readFloatFrame returned null");
+    return f;
+  });
+}
 
 function wideFrame(stages: ProcessingStageContribution[], bag: Record<string, unknown> = {}): Frame {
   return withRenderer({ stages: [...builtinStages(), ...stages], pipeline: LINEAR_PROBE_PIPELINE }, (r) => {
@@ -194,6 +255,66 @@ describe("Colour Correction stage on the real renderer", () => {
     let differing = 0;
     for (let i = 0; i < idle.data.length; i++) if (idle.data[i] !== bare.data[i]) differing++;
     expect(differing).toBe(0);
+  });
+
+  // The positive control is a no-space stage at the same phase and priority,
+  // which the host clips ahead of: it must move the frame, or the scene doesn't
+  // reach the stage over range and the test proves nothing.
+  it("carries values past white and below black through a tiny shift on version 2", () => {
+    const stage = colourCorrectionStage();
+    const clipsAhead: ProcessingStageContribution = {
+      id: "test.clips-ahead",
+      name: "Clips ahead",
+      phase: stage.phase,
+      priority: stage.priority,
+      glsl: "c = c;",
+      uniforms: [],
+    };
+    const bare = openFrame([]);
+    const clipped = openFrame([clipsAhead]);
+    let moved = 0;
+    let clipShift = 0;
+    for (let i = 0; i < bare.data.length; i++) {
+      if (bare.data[i] !== clipped.data[i]) moved++;
+      clipShift = Math.max(clipShift, Math.abs(bare.data[i] - clipped.data[i]));
+    }
+    expect(moved).toBeGreaterThan(W * H * 0.1);
+    const tiny = openFrame([stage], bagPatch({ ...DEFAULT_PARAMS, hib: 0.01 }));
+    let changed = 0;
+    let worst = 0;
+    for (let i = 0; i < tiny.data.length; i++) {
+      if (tiny.data[i] !== bare.data[i]) changed++;
+      worst = Math.max(worst, Math.abs(tiny.data[i] - bare.data[i]));
+    }
+    console.log(`[cc-gpu] tiny shift over range: ${changed} values moved, worst ${worst.toExponential(2)}; a clip moves ${clipShift.toExponential(2)}`);
+    expect(changed).toBeGreaterThan(0);
+    expect(worst).toBeLessThan(2e-3);
+  });
+
+  // Version 1 photos keep 1.1.0's shader, which clipped the colour on the way
+  // in and out: a tiny shift leaves each value where the clip puts it. On
+  // version 2 the same shift leaves the widened values outside [0, 1].
+  it("clips a tiny shift's result to [0, 1] on version 1, as 1.1.0 did, and not on version 2", () => {
+    const tinyBag = bagPatch({ ...DEFAULT_PARAMS, hib: 0.01 });
+    for (const version of [1, CURRENT_PROCESS_VERSION]) {
+      const bare = signedFrame([], {}, version);
+      const tiny = signedFrame([colourCorrectionStage()], tinyBag, version);
+      let outside = 0;
+      let outsideAfter = 0;
+      let worst = 0;
+      for (let i = 0; i < bare.data.length; i++) {
+        if (i % 4 === 3) continue;
+        const v = bare.data[i];
+        if (v < 0 || v > 1) outside++;
+        if (tiny.data[i] < 0 || tiny.data[i] > 1) outsideAfter++;
+        worst = Math.max(worst, Math.abs(tiny.data[i] - (version === 1 ? clamp01(v) : v)));
+      }
+      console.log(`[cc-gpu] v${version} tiny shift: ${outside} values outside [0, 1] going in, ${outsideAfter} after, worst ${worst.toExponential(2)}`);
+      expect(outside).toBeGreaterThan(W * H * 0.1);
+      expect(worst).toBeLessThan(2e-3);
+      if (version === 1) expect(outsideAfter).toBe(0);
+      else expect(outsideAfter).toBeGreaterThan(W * H * 0.1);
+    }
   });
 
   it("is a bit-exact no-op at the defaults", () => {
