@@ -2,19 +2,19 @@ let k = null;
 function wt(t) {
   k = t;
 }
-function A() {
+function P() {
   if (!k) throw new Error("[colour-correction] api used before activate()");
   return k;
 }
-const L = Object.freeze({
+const _ = Object.freeze({
   loa: 0,
   lob: 0,
   hia: 0,
   hib: 0,
   saturation: 1
-}), S = 40, B = -3, N = 3, Pt = 0.1, Tt = 0.5, K = 5, D = 8, v = (t, o, n) => t < o ? o : t > n ? n : t;
+}), S = 40, N = -3, B = 3, Et = 0.1, Rt = 0.5, K = 5, A = 8, D = (t, o, n) => t < o ? o : t > n ? n : t;
 function z(t) {
-  const o = v(t, 0, 1);
+  const o = D(t, 0, 1);
   return o < 31308e-7 ? o * 12.92 : 1.055 * Math.pow(o, 1 / 2.4) - 0.055;
 }
 const I = [0.96422, 1, 0.82521], et = [
@@ -28,31 +28,31 @@ const I = [0.96422, 1, 0.82521], et = [
   0.0971045,
   0.7141733
 ];
-function yt(t) {
-  const [o, n, r, a, s, h, d, i, g] = t, b = s * g - h * i, l = -(a * g - h * d), w = a * i - s * d, u = o * b + n * l + r * w;
+function vt(t) {
+  const [o, n, r, c, s, b, d, i, g] = t, h = s * g - b * i, l = -(c * g - b * d), w = c * i - s * d, u = o * h + n * l + r * w;
   return [
-    b / u,
+    h / u,
     -(n * g - r * i) / u,
-    (n * h - r * s) / u,
+    (n * b - r * s) / u,
     l / u,
     (o * g - r * d) / u,
-    -(o * h - r * a) / u,
+    -(o * b - r * c) / u,
     w / u,
     -(o * i - n * d) / u,
-    (o * s - n * a) / u
+    (o * s - n * c) / u
   ];
 }
-const rt = yt(et), x = 216 / 24389, E = 24389 / 27;
-function At(t, o) {
+const rt = vt(et), x = 216 / 24389, T = 24389 / 27;
+function Pt(t, o) {
   return [
     t[0] * o[0] + t[1] * o[1] + t[2] * o[2],
     t[3] * o[0] + t[4] * o[1] + t[5] * o[2],
     t[6] * o[0] + t[7] * o[1] + t[8] * o[2]
   ];
 }
-function Rt(t) {
-  const [o, n, r] = t, a = (o + 16) / 116, s = n / 500 + a, h = a - r / 200, d = s * s * s, i = h * h * h, g = d > x ? d : (116 * s - 16) / E, b = o > E * x ? a * a * a : o / E, l = i > x ? i : (116 * h - 16) / E;
-  return At(rt, [g * I[0], b * I[1], l * I[2]]);
+function yt(t) {
+  const [o, n, r] = t, c = (o + 16) / 116, s = n / 500 + c, b = c - r / 200, d = s * s * s, i = b * b * b, g = d > x ? d : (116 * s - 16) / T, h = o > T * x ? c * c * c : o / T, l = i > x ? i : (116 * b - 16) / T;
+  return Pt(rt, [g * I[0], h * I[1], l * I[2]]);
 }
 const Y = [
   { id: "warm-tone", label: "Warm tone", params: { loa: 0, lob: 0, hia: 0, hib: 3, saturation: 1 } },
@@ -62,61 +62,71 @@ const Y = [
 function j(t, o) {
   return 0.5 * (o + o * t / S);
 }
-function Z(t, o) {
-  return (2 * v(t, 0, o) - o) * S / o;
+function V(t, o) {
+  return (2 * D(t, 0, o) - o) * S / o;
 }
-function Et(t, o, n) {
-  const r = K * K, a = (t.loa - o) * (t.loa - o) + (t.lob - n) * (t.lob - n), s = (t.hia - o) * (t.hia - o) + (t.hib - n) * (t.hib - n);
-  return a < r && a < s ? "lo" : s < r && s <= a ? "hi" : null;
+function Tt(t, o, n) {
+  const r = K * K, c = (t.loa - o) * (t.loa - o) + (t.lob - n) * (t.lob - n), s = (t.hia - o) * (t.hia - o) + (t.hib - n) * (t.hib - n);
+  return c < r && c < s ? "lo" : s < r && s <= c ? "hi" : null;
 }
-function at(t, o, n, r) {
+function ct(t, o, n, r) {
   return o === "lo" ? { ...t, loa: n, lob: r } : { ...t, hia: n, hib: r };
 }
-function Dt(t, o) {
-  return o === "lo" ? { ...t, loa: 0, lob: 0 } : o === "hi" ? { ...t, hia: 0, hib: 0 } : { ...L };
+function At(t, o) {
+  return o === "lo" ? { ...t, loa: 0, lob: 0 } : o === "hi" ? { ...t, hia: 0, hib: 0 } : { ..._ };
 }
-function vt(t, o, n, r) {
-  const a = v((o === "lo" ? t.loa : t.hia) + n, -S, S), s = v((o === "lo" ? t.lob : t.hib) + r, -S, S);
-  return at(t, o, a, s);
+function Dt(t, o, n, r) {
+  const c = D((o === "lo" ? t.loa : t.hia) + n, -S, S), s = D((o === "lo" ? t.lob : t.hib) + r, -S, S);
+  return ct(t, o, c, s);
 }
-function Lt(t, o) {
+function _t(t, o) {
   if (o === 0) return t;
-  const n = t.saturation - Pt * Math.sign(o);
-  return { ...t, saturation: v(Math.round(n * 100) / 100, B, N) };
+  const n = t.saturation - Et * Math.sign(o);
+  return { ...t, saturation: D(Math.round(n * 100) / 100, N, B) };
 }
-const _t = 53.390011;
+const Lt = 53.390011;
 function Ct(t, o, n) {
-  const r = _t, a = r * 0.05 * S;
-  return [r, n * (a * (t / (D - 1) - 0.5)), n * (a * (o / (D - 1) - 0.5))];
+  const r = Lt, c = r * 0.05 * S;
+  return [r, n * (c * (t / (A - 1) - 0.5)), n * (c * (o / (A - 1) - 0.5))];
 }
 function It(t, o, n) {
-  const r = Rt(Ct(t, o, n));
+  const r = yt(Ct(t, o, n));
   return [z(r[0]), z(r[1]), z(r[2])];
 }
-const ct = "colour-correction", H = `${ct}.lab`, M = ["hia", "hib", "loa", "lob", "saturation"], U = (t) => `${H}.${t}`;
+const at = "colour-correction", H = `${at}.lab`, O = ["hia", "hib", "loa", "lob", "saturation"], U = (t) => `${H}.${t}`;
 function st(t) {
   const o = {};
-  for (const n of M) o[U(n)] = t[n];
+  for (const n of O) o[U(n)] = t[n];
   return o;
 }
-function V(t) {
-  const o = { ...L };
-  for (const n of M) {
+function Z(t) {
+  const o = { ..._ };
+  for (const n of O) {
     const r = t[U(n)];
     typeof r == "number" && Number.isFinite(r) && (o[n] = r);
   }
   return o;
 }
-function O(t) {
+function M(t) {
   const o = t.toPrecision(10);
   return o.includes("e") ? t.toFixed(12) : o;
 }
 function q(t) {
-  return `mat3(${[0, 3, 6, 1, 4, 7, 2, 5, 8].map((n) => O(t[n])).join(", ")})`;
+  return `mat3(${[0, 3, 6, 1, 4, 7, 2, 5, 8].map((n) => M(t[n])).join(", ")})`;
 }
-const C = O(x), R = O(E), J = `vec3(${I.map(O).join(", ")})`, xt = `
+const C = M(x), y = M(T), J = `vec3(${I.map(M).join(", ")})`, xt = `
+#if SL_PROCESS_VERSION >= 2
+vec3 ccDecode(vec3 y) {
+  vec3 a = abs(y);
+  return sign(y) * mix(a / 12.92, pow((a + 0.055) / 1.055, vec3(2.4)), step(0.04045, a));
+}
+vec3 ccEncode(vec3 x) {
+  vec3 a = abs(x);
+  return sign(x) * mix(a * 12.92, 1.055 * pow(a, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, a));
+}
+#endif
 float ccF(float t) {
-  return t > ${C} ? pow(t, 1.0 / 3.0) : (${R} * t + 16.0) / 116.0;
+  return t > ${C} ? pow(t, 1.0 / 3.0) : (${y} * t + 16.0) / 116.0;
 }
 vec3 ccLab(vec3 rgb) {
   const mat3 toXyz = ${q(et)};
@@ -131,32 +141,40 @@ vec3 ccRgb(vec3 lab) {
   float fz = fy - lab.z / 200.0;
   float fx3 = fx * fx * fx;
   float fz3 = fz * fz * fz;
-  float xr = fx3 > ${C} ? fx3 : (116.0 * fx - 16.0) / ${R};
-  float yr = lab.x > ${R} * ${C} ? fy * fy * fy : lab.x / ${R};
-  float zr = fz3 > ${C} ? fz3 : (116.0 * fz - 16.0) / ${R};
+  float xr = fx3 > ${C} ? fx3 : (116.0 * fx - 16.0) / ${y};
+  float yr = lab.x > ${y} * ${C} ? fy * fy * fy : lab.x / ${y};
+  float zr = fz3 > ${C} ? fz3 : (116.0 * fz - 16.0) / ${y};
   return toRgb * (vec3(xr, yr, zr) * ${J});
 }
-`, Mt = `
+`, Ot = `
 {
   if (saturation != 1.0 || hia != 0.0 || hib != 0.0 || loa != 0.0 || lob != 0.0) {
+#if SL_PROCESS_VERSION >= 2
+    vec3 lab = ccLab(ccDecode(c));
+#else
     vec3 lab = ccLab(srgbToLinear(clamp(c, 0.0, 1.0)));
+#endif
     lab.y = saturation * (lab.y + lab.x * (hia - loa) * 0.01 + loa);
     lab.z = saturation * (lab.z + lab.x * (hib - lob) * 0.01 + lob);
+#if SL_PROCESS_VERSION >= 2
+    c = ccEncode(ccRgb(lab));
+#else
     c = linearToSrgb(ccRgb(lab));
+#endif
   }
 }
-`, Ot = {
+`, Mt = {
   hia: "highlight a",
   hib: "highlight b",
   loa: "shadow a",
   lob: "shadow b",
   saturation: "saturation"
-}, $t = M.map((t) => ({
+}, $t = O.map((t) => ({
   key: t,
   glslType: "float",
-  default: L[t],
-  range: t === "saturation" ? { min: B, max: N, step: 0.01 } : { min: -S, max: S, step: 0.5 },
-  label: Ot[t]
+  default: _[t],
+  range: t === "saturation" ? { min: N, max: B, step: 0.01 } : { min: -S, max: S, step: 0.5 },
+  label: Mt[t]
 }));
 function zt() {
   return {
@@ -164,7 +182,7 @@ function zt() {
     name: "Colour Correction",
     phase: "display-adjust",
     space: { encoding: "perceptual" },
-    glsl: Mt,
+    glsl: Ot,
     helpers: xt,
     uniforms: $t,
     // A mask's copy runs at the defaults until its board moves, so the gate
@@ -172,105 +190,105 @@ function zt() {
     mask: { maskable: !0 }
   };
 }
-const m = 5, Q = 3, tt = 5, kt = "rgb(153,153,153)", Bt = "rgb(26,26,26)", Nt = "rgb(230,230,230)", Ht = (t) => `rgb(${Math.round(t[0] * 255)},${Math.round(t[1] * 255)},${Math.round(t[2] * 255)})`;
-function ot(t, o, n, r, a) {
-  t.beginPath(), t.arc(o, n, r, 0, Math.PI * 2), t.fillStyle = a, t.fill();
+const m = 5, Q = 3, tt = 5, kt = "rgb(153,153,153)", Nt = "rgb(26,26,26)", Bt = "rgb(230,230,230)", Ht = (t) => `rgb(${Math.round(t[0] * 255)},${Math.round(t[1] * 255)},${Math.round(t[2] * 255)})`;
+function ot(t, o, n, r, c) {
+  t.beginPath(), t.arc(o, n, r, 0, Math.PI * 2), t.fillStyle = c, t.fill();
 }
 function Ut(t, o, n, r) {
   t.clearRect(0, 0, o, o);
-  const a = o - 2 * m, s = (i) => Math.round(a * i / D);
-  for (let i = 0; i < D; i++) {
-    const g = m + a - s(i), b = m + a - s(i + 1);
-    for (let l = 0; l < D; l++) {
+  const c = o - 2 * m, s = (i) => Math.round(c * i / A);
+  for (let i = 0; i < A; i++) {
+    const g = m + c - s(i), h = m + c - s(i + 1);
+    for (let l = 0; l < A; l++) {
       const w = m + s(l), u = m + s(l + 1);
-      t.fillStyle = Ht(It(l, i, n.saturation)), t.fillRect(w, b + 1, u - w - 1, g - b - 1);
+      t.fillStyle = Ht(It(l, i, n.saturation)), t.fillRect(w, h + 1, u - w - 1, g - h - 1);
     }
   }
-  const h = (i) => m + j(i, a), d = (i) => m + a - j(i, a);
-  t.lineWidth = 2, t.strokeStyle = kt, t.beginPath(), t.moveTo(h(n.loa), d(n.lob)), t.lineTo(h(n.hia), d(n.hib)), t.stroke(), ot(t, h(n.loa), d(n.lob), r === "lo" ? tt : Q, Bt), ot(t, h(n.hia), d(n.hib), r === "hi" ? tt : Q, Nt);
+  const b = (i) => m + j(i, c), d = (i) => m + c - j(i, c);
+  t.lineWidth = 2, t.strokeStyle = kt, t.beginPath(), t.moveTo(b(n.loa), d(n.lob)), t.lineTo(b(n.hia), d(n.hib)), t.stroke(), ot(t, b(n.loa), d(n.lob), r === "lo" ? tt : Q, Nt), ot(t, b(n.hia), d(n.hib), r === "hi" ? tt : Q, Bt);
 }
 function Ft(t, o, n) {
   const r = n - 2 * m;
-  return { a: Z(t - m, r), b: Z(r - (o - m), r) };
+  return { a: V(t - m, r), b: V(r - (o - m), r) };
 }
 const Xt = "Colour Correction", Wt = 300, Gt = 3, Kt = 10, Yt = 0.1, jt = {
   ArrowUp: [0, 1],
   ArrowDown: [0, -1],
   ArrowRight: [1, 0],
   ArrowLeft: [-1, 0]
-}, Zt = "drag the line for split-toning. bright means highlights, dark means shadows. use mouse wheel to change saturation.";
+}, Vt = "drag the line for split-toning. bright means highlights, dark means shadows. use mouse wheel to change saturation.";
 function nt() {
-  const { createElement: t, useEffect: o, useRef: n, useState: r } = A().react, { Slider: a } = A().components, { Select: s, tokens: h } = A().ui, d = A().develop.useParamScope(), i = d.getParams(), g = V(i), b = () => V(d.getParams()), [l, w] = r(null), [u, it] = r(240), [lt, F] = r(!1), X = n(null), $ = n(null), _ = n(null), P = n(null), T = (e) => d.setParams(st(e)), y = () => d.commit(Xt), W = () => {
-    P.current !== null && window.clearTimeout(P.current), P.current = window.setTimeout(() => {
-      P.current = null, y();
+  const { createElement: t, useEffect: o, useRef: n, useState: r } = P().react, { Slider: c } = P().components, { Select: s, tokens: b } = P().ui, d = P().develop.useParamScope(), i = d.getParams(), g = Z(i), h = () => Z(d.getParams()), [l, w] = r(null), [u, it] = r(240), [lt, F] = r(!1), X = n(null), $ = n(null), L = n(null), E = n(null), R = (e) => d.setParams(st(e)), v = () => d.commit(Xt), W = () => {
+    E.current !== null && window.clearTimeout(E.current), E.current = window.setTimeout(() => {
+      E.current = null, v();
     }, Wt);
   };
   o(
     () => () => {
-      P.current !== null && (window.clearTimeout(P.current), y());
+      E.current !== null && (window.clearTimeout(E.current), v());
     },
     []
   ), o(() => {
     const e = X.current;
     if (!e) return;
-    const c = new ResizeObserver((f) => {
+    const a = new ResizeObserver((f) => {
       const p = f[0].contentRect.width;
       p > 0 && it(Math.round(p));
     });
-    return c.observe(e), () => c.disconnect();
+    return a.observe(e), () => a.disconnect();
   }, []), o(() => {
     const e = $.current;
     if (!e) return;
-    const c = (f) => {
-      f.preventDefault(), T(Lt(b(), f.deltaY)), W();
+    const a = (f) => {
+      f.preventDefault(), R(_t(h(), f.deltaY)), W();
     };
-    return e.addEventListener("wheel", c, { passive: !1 }), () => e.removeEventListener("wheel", c);
+    return e.addEventListener("wheel", a, { passive: !1 }), () => e.removeEventListener("wheel", a);
   }, [d.maskId]), o(() => {
     const e = $.current;
     if (!e) return;
-    const c = window.devicePixelRatio || 1;
-    e.width = u * c, e.height = u * c;
+    const a = window.devicePixelRatio || 1;
+    e.width = u * a, e.height = u * a;
     const f = e.getContext("2d");
-    f && (f.setTransform(c, 0, 0, c, 0, 0), Ut(f, u, g, l));
+    f && (f.setTransform(a, 0, 0, a, 0, 0), Ut(f, u, g, l));
   }, [i, l, u]);
   const ut = (e) => {
-    const c = e.currentTarget.getBoundingClientRect(), f = c.width > 0 ? u / c.width : 1;
-    return Ft((e.clientX - c.left) * f, (e.clientY - c.top) * f, u);
+    const a = e.currentTarget.getBoundingClientRect(), f = a.width > 0 ? u / a.width : 1;
+    return Ft((e.clientX - a.left) * f, (e.clientY - a.top) * f, u);
   }, ft = (e) => {
-    const { a: c, b: f } = ut(e), p = _.current;
+    const { a, b: f } = ut(e), p = L.current;
     if (p) {
       if (!l || !p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) < Gt) return;
-      p.moved = !0, T(at(b(), l, c, f));
+      p.moved = !0, R(ct(h(), l, a, f));
       return;
     }
-    w(Et(g, c, f));
+    w(Tt(g, a, f));
   }, dt = (e) => {
-    e.button === 0 && (e.currentTarget.setPointerCapture(e.pointerId), e.currentTarget.focus({ preventScroll: !0 }), _.current = { x: e.clientX, y: e.clientY, moved: !1 }, F(!0));
+    e.button === 0 && (e.currentTarget.setPointerCapture(e.pointerId), e.currentTarget.focus({ preventScroll: !0 }), L.current = { x: e.clientX, y: e.clientY, moved: !1 }, F(!0));
   }, G = () => {
-    const e = _.current;
-    _.current = null, F(!1), e != null && e.moved && y();
-  }, ht = () => {
-    T(Dt(b(), l)), y();
-  }, bt = (e) => {
-    const c = jt[e.key];
-    if (!c || !l) return;
+    const e = L.current;
+    L.current = null, F(!1), e != null && e.moved && v();
+  }, bt = () => {
+    R(At(h(), l)), v();
+  }, ht = (e) => {
+    const a = jt[e.key];
+    if (!a || !l) return;
     e.preventDefault();
-    const f = Tt * (e.shiftKey ? Kt : e.ctrlKey ? Yt : 1);
-    T(vt(b(), l, c[0] * f, c[1] * f)), W();
+    const f = Rt * (e.shiftKey ? Kt : e.ctrlKey ? Yt : 1);
+    R(Dt(h(), l, a[0] * f, a[1] * f)), W();
   }, gt = t(
     "div",
     { ref: X, style: { width: "100%" } },
     t("canvas", {
       ref: $,
       tabIndex: 0,
-      title: Zt,
+      title: Vt,
       "aria-label": "Colour board: light dot tints highlights, dark dot tints shadows",
       style: {
         width: u,
         height: u,
         display: "block",
         borderRadius: 4,
-        background: h.surface0,
+        background: b.surface0,
         touchAction: "none",
         outline: "none",
         cursor: lt && l ? "grabbing" : l ? "grab" : "default"
@@ -279,29 +297,29 @@ function nt() {
       onPointerMove: ft,
       onPointerUp: G,
       onPointerCancel: G,
-      onDoubleClick: ht,
-      onKeyDown: bt
+      onDoubleClick: bt,
+      onKeyDown: ht
     })
-  ), mt = t(a, {
+  ), mt = t(c, {
     label: "Saturation",
     value: g.saturation,
-    min: B,
-    max: N,
+    min: N,
+    max: B,
     step: 0.01,
-    defaultValue: L.saturation,
-    onChange: (e) => T({ ...b(), saturation: e }),
-    onCommit: y
+    defaultValue: _.saturation,
+    onChange: (e) => R({ ...h(), saturation: e }),
+    onCommit: v
   }), St = t(s, {
     value: "",
     ariaLabel: "Presets",
     options: [{ value: "", label: "Presets…" }, ...Y.map((e) => ({ value: e.id, label: e.label }))],
     onChange: (e) => {
-      const c = Y.find((f) => f.id === e);
-      c && (T({ ...c.params }), y());
+      const a = Y.find((f) => f.id === e);
+      a && (R({ ...a.params }), v());
     }
   }), pt = t(
     "p",
-    { style: { margin: "2px 0 0", fontSize: 10, color: h.textMuted, lineHeight: 1.35 } },
+    { style: { margin: "2px 0 0", fontSize: 10, color: b.textMuted, lineHeight: 1.35 } },
     "Drag the light dot to tint highlights and the dark dot to tint shadows · wheel sets saturation · arrows nudge the picked dot · double-click resets."
   );
   return t(
@@ -313,24 +331,24 @@ function nt() {
     pt
   );
 }
-const Vt = `${ct}.panel`;
+const Zt = `${at}.panel`;
 function qt() {
-  const t = A().stores.useDevelopStore.getState();
-  t.setDynParams(st(L)), t.commitEdit("Colour Correction reset");
+  const t = P().stores.useDevelopStore.getState();
+  t.setDynParams(st(_)), t.commitEdit("Colour Correction reset");
 }
 function Jt(t) {
   wt(t), t.registerProcessingStage(zt()), t.registerPanel({
-    id: Vt,
+    id: Zt,
     title: "Colour Correction",
     component: nt,
     defaultDock: { module: "develop", direction: "right", order: 7, width: 268 },
     onReset: qt,
     // The same panel edits a mask's correction in the Masking panel's Adjust tab.
-    mask: { component: nt, owns: M.map(U) }
+    mask: { component: nt, owns: O.map(U) }
   });
 }
 function Qt() {
-  A().unregisterProcessingStage(H);
+  P().unregisterProcessingStage(H);
 }
 export {
   Jt as activate,
