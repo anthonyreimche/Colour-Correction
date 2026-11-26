@@ -75,6 +75,8 @@ export interface PanelContribution {
   component: ComponentType;
   order?: number;
   defaultDock?: PanelDockDefault;
+  /** The modules the panel may be docked in; omitted, every module (Safelight 3.2.8). */
+  modules?: readonly string[];
   onReset?: () => void;
   /** Offers the panel in a mask's Adjust tab: each mask that adds it renders
    *  `component`, which edits that mask's values through useParamScope. `owns`

@@ -1,6 +1,6 @@
 {
   "name": "safelight-colour-correction",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Colour Correction extension for SafeLight — a port of darktable's colour correction module: split-toning and saturation in Lab.",
   "type": "module",
   "scripts": {

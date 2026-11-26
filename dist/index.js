@@ -1,5 +1,5 @@
 let k = null;
-function wt(t) {
+function vt(t) {
   k = t;
 }
 function P() {
@@ -12,7 +12,7 @@ const _ = Object.freeze({
   hia: 0,
   hib: 0,
   saturation: 1
-}), S = 40, N = -3, B = 3, Et = 0.1, Rt = 0.5, K = 5, A = 8, D = (t, o, n) => t < o ? o : t > n ? n : t;
+}), S = 40, N = -3, B = 3, wt = 0.1, Et = 0.5, K = 5, A = 8, D = (t, o, n) => t < o ? o : t > n ? n : t;
 function z(t) {
   const o = D(t, 0, 1);
   return o < 31308e-7 ? o * 12.92 : 1.055 * Math.pow(o, 1 / 2.4) - 0.055;
@@ -28,8 +28,8 @@ const I = [0.96422, 1, 0.82521], et = [
   0.0971045,
   0.7141733
 ];
-function vt(t) {
-  const [o, n, r, c, s, b, d, i, g] = t, h = s * g - b * i, l = -(c * g - b * d), w = c * i - s * d, u = o * h + n * l + r * w;
+function Rt(t) {
+  const [o, n, r, c, s, b, d, i, g] = t, h = s * g - b * i, l = -(c * g - b * d), v = c * i - s * d, u = o * h + n * l + r * v;
   return [
     h / u,
     -(n * g - r * i) / u,
@@ -37,12 +37,12 @@ function vt(t) {
     l / u,
     (o * g - r * d) / u,
     -(o * b - r * c) / u,
-    w / u,
+    v / u,
     -(o * i - n * d) / u,
     (o * s - n * c) / u
   ];
 }
-const rt = vt(et), x = 216 / 24389, T = 24389 / 27;
+const rt = Rt(et), x = 216 / 24389, T = 24389 / 27;
 function Pt(t, o) {
   return [
     t[0] * o[0] + t[1] * o[1] + t[2] * o[2],
@@ -81,7 +81,7 @@ function Dt(t, o, n, r) {
 }
 function _t(t, o) {
   if (o === 0) return t;
-  const n = t.saturation - Et * Math.sign(o);
+  const n = t.saturation - wt * Math.sign(o);
   return { ...t, saturation: D(Math.round(n * 100) / 100, N, B) };
 }
 const Lt = 53.390011;
@@ -200,8 +200,8 @@ function Ut(t, o, n, r) {
   for (let i = 0; i < A; i++) {
     const g = m + c - s(i), h = m + c - s(i + 1);
     for (let l = 0; l < A; l++) {
-      const w = m + s(l), u = m + s(l + 1);
-      t.fillStyle = Ht(It(l, i, n.saturation)), t.fillRect(w, h + 1, u - w - 1, g - h - 1);
+      const v = m + s(l), u = m + s(l + 1);
+      t.fillStyle = Ht(It(l, i, n.saturation)), t.fillRect(v, h + 1, u - v - 1, g - h - 1);
     }
   }
   const b = (i) => m + j(i, c), d = (i) => m + c - j(i, c);
@@ -218,14 +218,14 @@ const Xt = "Colour Correction", Wt = 300, Gt = 3, Kt = 10, Yt = 0.1, jt = {
   ArrowLeft: [-1, 0]
 }, Vt = "drag the line for split-toning. bright means highlights, dark means shadows. use mouse wheel to change saturation.";
 function nt() {
-  const { createElement: t, useEffect: o, useRef: n, useState: r } = P().react, { Slider: c } = P().components, { Select: s, tokens: b } = P().ui, d = P().develop.useParamScope(), i = d.getParams(), g = Z(i), h = () => Z(d.getParams()), [l, w] = r(null), [u, it] = r(240), [lt, F] = r(!1), X = n(null), $ = n(null), L = n(null), E = n(null), R = (e) => d.setParams(st(e)), v = () => d.commit(Xt), W = () => {
-    E.current !== null && window.clearTimeout(E.current), E.current = window.setTimeout(() => {
-      E.current = null, v();
+  const { createElement: t, useEffect: o, useRef: n, useState: r } = P().react, { Slider: c } = P().components, { Select: s, tokens: b } = P().ui, d = P().develop.useParamScope(), i = d.getParams(), g = Z(i), h = () => Z(d.getParams()), [l, v] = r(null), [u, it] = r(240), [lt, F] = r(!1), X = n(null), $ = n(null), L = n(null), w = n(null), E = (e) => d.setParams(st(e)), R = () => d.commit(Xt), W = () => {
+    w.current !== null && window.clearTimeout(w.current), w.current = window.setTimeout(() => {
+      w.current = null, R();
     }, Wt);
   };
   o(
     () => () => {
-      E.current !== null && (window.clearTimeout(E.current), v());
+      w.current !== null && (window.clearTimeout(w.current), R());
     },
     []
   ), o(() => {
@@ -240,7 +240,7 @@ function nt() {
     const e = $.current;
     if (!e) return;
     const a = (f) => {
-      f.preventDefault(), R(_t(h(), f.deltaY)), W();
+      f.preventDefault(), E(_t(h(), f.deltaY)), W();
     };
     return e.addEventListener("wheel", a, { passive: !1 }), () => e.removeEventListener("wheel", a);
   }, [d.maskId]), o(() => {
@@ -258,23 +258,23 @@ function nt() {
     const { a, b: f } = ut(e), p = L.current;
     if (p) {
       if (!l || !p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) < Gt) return;
-      p.moved = !0, R(ct(h(), l, a, f));
+      p.moved = !0, E(ct(h(), l, a, f));
       return;
     }
-    w(Tt(g, a, f));
+    v(Tt(g, a, f));
   }, dt = (e) => {
     e.button === 0 && (e.currentTarget.setPointerCapture(e.pointerId), e.currentTarget.focus({ preventScroll: !0 }), L.current = { x: e.clientX, y: e.clientY, moved: !1 }, F(!0));
   }, G = () => {
     const e = L.current;
-    L.current = null, F(!1), e != null && e.moved && v();
+    L.current = null, F(!1), e != null && e.moved && R();
   }, bt = () => {
-    R(At(h(), l)), v();
+    E(At(h(), l)), R();
   }, ht = (e) => {
     const a = jt[e.key];
     if (!a || !l) return;
     e.preventDefault();
-    const f = Rt * (e.shiftKey ? Kt : e.ctrlKey ? Yt : 1);
-    R(Dt(h(), l, a[0] * f, a[1] * f)), W();
+    const f = Et * (e.shiftKey ? Kt : e.ctrlKey ? Yt : 1);
+    E(Dt(h(), l, a[0] * f, a[1] * f)), W();
   }, gt = t(
     "div",
     { ref: X, style: { width: "100%" } },
@@ -307,15 +307,15 @@ function nt() {
     max: B,
     step: 0.01,
     defaultValue: _.saturation,
-    onChange: (e) => R({ ...h(), saturation: e }),
-    onCommit: v
+    onChange: (e) => E({ ...h(), saturation: e }),
+    onCommit: R
   }), St = t(s, {
     value: "",
     ariaLabel: "Presets",
     options: [{ value: "", label: "Presets…" }, ...Y.map((e) => ({ value: e.id, label: e.label }))],
     onChange: (e) => {
       const a = Y.find((f) => f.id === e);
-      a && (R({ ...a.params }), v());
+      a && (E({ ...a.params }), R());
     }
   }), pt = t(
     "p",
@@ -337,11 +337,12 @@ function qt() {
   t.setDynParams(st(_)), t.commitEdit("Colour Correction reset");
 }
 function Jt(t) {
-  wt(t), t.registerProcessingStage(zt()), t.registerPanel({
+  vt(t), t.registerProcessingStage(zt()), t.registerPanel({
     id: Zt,
     title: "Colour Correction",
     component: nt,
     defaultDock: { module: "develop", direction: "right", order: 7, width: 268 },
+    modules: ["develop"],
     onReset: qt,
     // The same panel edits a mask's correction in the Masking panel's Adjust tab.
     mask: { component: nt, owns: O.map(U) }
